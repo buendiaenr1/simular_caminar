@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Momentos Articulares en Caminata</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .controls { margin-bottom: 20px; }
+        .slider-container { display: flex; align-items: center; margin: 10px 0; }
+        label { width: 180px; }
+        input[type="range"] { flex-grow: 1; margin-left: 10px; }
+        #jointChart { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Análisis de Momentos Articulares en Caminata</h1>
+        
+        <div class="controls">
+            <div class="slider-container">
+                <label for="strideLength">Longitud de zancada (m):</label>
+                <input type="range" id="strideLength" min="0.5" max="1.2" value="0.8" step="0.01">
+                <span id="strideValue">0.8</span>
+            </div>
+            
+            <div class="slider-container">
+                <label for="mass">Masa corporal (kg):</label>
+                <input type="range" id="mass" min="50" max="100" value="70" step="1">
+                <span id="massValue">70</span>
+            </div>
+            
+            <div class="slider-container">
+                <label for="cadence">Cadencia (pasos/min):</label>
+                <input type="range" id="cadence" min="80" max="140" value="110" step="1">
+                <span id="cadenceValue">110</span>
+            </div>
+        </div>
+
+        <canvas id="jointChart" width="800" height="400"></canvas>
+        
+        <div class="results">
+            <p><strong>Knee Torque Peak:</strong> <span id="kneePeak">0</span> N·m</p>
+            <p><strong>Hip Torque Peak:</strong> <span id="hipPeak">0</span> N·m</p>
+        </div>
+    </div>
+
+    <script>
+        // Elementos DOM
+        const strideSlider = document.getElementById('strideLength');
+        const massSlider = document.getElementById('mass');
+        const cadenceSlider = document.getElementById('cadence');
+        const strideValue = document.getElementById('strideValue');
+        const massValue = document.getElementById('massValue');
+        const cadenceValue = document.getElementById('cadenceValue');
+        const kneePeakSpan = document.getElementById('kneePeak');
+        const hipPeakSpan = document.getElementById('hipPeak');
+        const chartCtx = document.getElementById('jointChart').getContext('2d');
+
+        // Variables de simulación
+        let strideLength = 0.8;
+        let mass = 70;
+        let cadence = 110;
+        let kneeData = [];
+        let hipData = [];
+        let timeData = [];
+
+        // Inicializar gráfico
+        const chart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Momento de Rodilla (N·m)',
+                        data: [],
+                        borderColor: 'blue',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        fill: false,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Momento de Cadera (N·m)',
+                        data: [],
+                        borderColor: 'red',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: false,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Tiempo (% ciclo de zancada)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Momento Articular (N·m)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Actualizar simulación
+        function updateSimulation() {
+            // Obtener valores actuales
+            strideLength = parseFloat(strideSlider.value);
+            mass = parseFloat(massSlider.value);
+            cadence = parseFloat(cadenceSlider.value);
+            
+            // Actualizar displays
+            strideValue.textContent = strideLength.toFixed(2);
+            massValue.textContent = mass;
+            cadenceValue.textContent = cadence;
+            
+            // Calcular datos de simulación
+            calculateJointMoments();
+            
+            // Actualizar gráfico
+            updateChart();
+            
+            // Mostrar resultados
+            showResults();
+        }
+
+        // Calcular momentos articulares (modelo simplificado)
+        function calculateJointMoments() {
+            const cycleDuration = 60 / cadence; // Duración de un ciclo (segundos)
+            const steps = 100; // Puntos de datos por ciclo
+            
+            kneeData = [];
+            hipData = [];
+            timeData = [];
+            
+            for (let i = 0; i < steps; i++) {
+                const t = (i / steps) * cycleDuration;
+                const phase = (i / steps) * 2 * Math.PI; // Fase del ciclo
+                
+                // Modelo simplificado de momentos (basado en literatura biomecánica)
+                const kneeTorque = mass * 9.81 * strideLength * 0.15 * Math.sin(phase);
+                const hipTorque = mass * 9.81 * strideLength * 0.25 * Math.sin(phase + Math.PI/4);
+                
+                kneeData.push(kneeTorque);
+                hipData.push(hipTorque);
+                timeData.push((i/steps) * 100); // Porcentaje del ciclo
+            }
+        }
+
+        // Actualizar gráfico
+        function updateChart() {
+            chart.data.labels = timeData.map(t => `${Math.round(t)}%`);
+            chart.data.datasets[0].data = kneeData;
+            chart.data.datasets[1].data = hipData;
+            chart.update();
+        }
+
+        // Mostrar resultados clave
+        function showResults() {
+            const maxKnee = Math.max(...kneeData);
+            const maxHip = Math.max(...hipData);
+            
+            kneePeakSpan.textContent = maxKnee.toFixed(1);
+            hipPeakSpan.textContent = maxHip.toFixed(1);
+        }
+
+        // Event listeners
+        strideSlider.addEventListener('input', updateSimulation);
+        massSlider.addEventListener('input', updateSimulation);
+        cadenceSlider.addEventListener('input', updateSimulation);
+
+        // Iniciar simulación
+        updateSimulation();
+    </script>
+</body>
+</html>
