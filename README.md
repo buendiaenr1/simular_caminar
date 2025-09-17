@@ -1,0 +1,2 @@
+# simular_caminar
+Simulación
